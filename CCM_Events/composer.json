@@ -1,0 +1,11 @@
+{
+    "name": "ccm/events",
+    "description": "Module de gestion des évènements pour Air Corsica Virtuel",
+    "type": "phpvms-module",
+    "require": {},
+    "autoload": {
+        "psr-4": {
+            "Modules\\CCM_Events\\": "."
+        }
+    }
+}

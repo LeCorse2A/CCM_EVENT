@@ -1,0 +1,12 @@
+{
+    "name": "CCM_Events",
+    "alias": "ccm_events",
+    "description": "Gestion centralisée des évènements (calendrier, vols associés, réservations avion/aéroport) pour Air Corsica Virtuel.",
+    "keywords": ["events", "flights", "reservations", "planning"],
+    "version": "1.0.0",
+    "priority": 0,
+    "providers": [
+        "Modules\\CCM_Events\\Providers\\CCM_EventsServiceProvider"
+    ],
+    "files": []
+}
