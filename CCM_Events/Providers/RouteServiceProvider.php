@@ -21,6 +21,21 @@ class RouteServiceProvider extends ServiceProvider
     {
         $this->mapAdminRoutes();
         $this->mapPublicRoutes();
+        $this->mapShowcaseRoutes();
+    }
+
+    /**
+     * Page vitrine publique des évènements (/evenements).
+     * Accessible SANS connexion (visiteurs, VATSIM, etc.).
+     */
+    protected function mapShowcaseRoutes(): void
+    {
+        Route::group([
+            'namespace'  => $this->publicNamespace,
+            'middleware' => ['web'],
+        ], function () {
+            Route::get('/evenements', 'PublicController@showcase')->name('ccm_events.showcase');
+        });
     }
 
     /**

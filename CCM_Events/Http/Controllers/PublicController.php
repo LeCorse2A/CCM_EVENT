@@ -70,6 +70,86 @@ class PublicController extends Controller
         ]);
     }
 
+    /**
+     * Catégories : valeur enregistrée en base (onglet admin), sinon config.
+     */
+    protected function getStoredCategories()
+    {
+        $row = DB::table('ccm_events_settings')->where('key', 'categories')->first();
+
+        return $row ? json_decode($row->value, true) : config('ccm_events.categories');
+    }
+
+    /**
+     * Page vitrine PUBLIQUE (/evenements), accessible sans connexion.
+     * - Évènements à venir + évènements passés (annulés et supprimés exclus)
+     * - Seuls les pilotes "participating" sont comptés (les déclinés sont ignorés)
+     * - Les pilotes sont affichés uniquement par leur callsign (CCMxxxx)
+     */
+    public function showcase()
+    {
+        $now   = Carbon::now();
+        $today = $now->format('Y-m-d');
+        $time  = $now->format('H:i:s');
+
+        $with = [
+            'legs',
+            'participants' => function ($q) {
+                $q->where('status', 'participating')->with('user:id,callsign');
+            },
+        ];
+
+        $upcoming = Event::with($with)
+            ->where('status', 'active')
+            ->where(function ($q) use ($today, $time) {
+                $q->where('date', '>', $today)
+                  ->orWhere(function ($q2) use ($today, $time) {
+                      $q2->where('date', $today)->where('end_time', '>=', $time);
+                  });
+            })
+            ->orderBy('date')
+            ->orderBy('start_time')
+            ->get();
+
+        $past = Event::with($with)
+            ->where('status', 'active')
+            ->where(function ($q) use ($today, $time) {
+                $q->where('date', '<', $today)
+                  ->orWhere(function ($q2) use ($today, $time) {
+                      $q2->where('date', $today)->where('end_time', '<', $time);
+                  });
+            })
+            ->orderByDesc('date')
+            ->orderByDesc('start_time')
+            ->get();
+
+        // Liste des callsigns "CCMxxxx" pour chaque évènement
+        $mapCallsigns = function ($event) {
+            $event->pilot_callsigns = $event->participants
+                ->map(function ($p) {
+                    return optional($p->user)->callsign ? 'CCM'.$p->user->callsign : null;
+                })
+                ->filter()
+                ->sort(SORT_NATURAL)
+                ->values();
+        };
+        $upcoming->each($mapCallsigns);
+        $past->each($mapCallsigns);
+
+        $totalEvents         = $past->count();
+        $totalParticipations = $past->sum(function ($e) { return $e->participants->count(); });
+        $average             = $totalEvents > 0 ? round($totalParticipations / $totalEvents, 1) : 0;
+
+        return view('ccm_events::public.showcase', [
+            'upcoming'            => $upcoming,
+            'past'                => $past,
+            'categories'          => $this->getStoredCategories(),
+            'totalEvents'         => $totalEvents,
+            'totalParticipations' => $totalParticipations,
+            'average'             => $average,
+        ]);
+    }
+
     public function participate($id)
     {
         EventParticipant::updateOrCreate(

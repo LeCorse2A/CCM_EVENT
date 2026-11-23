@@ -100,10 +100,12 @@ class EventController extends Controller
             'description' => 'nullable|string',
             'category'    => 'nullable|string',
             'type'        => 'nullable|in:flight,non_flight',
+            'network'     => 'nullable|string|max:20',
             'status'      => 'nullable|in:active,cancelled',
             'banner'      => 'nullable|image|mimes:jpg,jpeg,png,gif,bmp,webp,avif|max:20480',
         ]);
 
+        $validated['network'] = Event::cleanNetwork($validated['network'] ?? null);
         $validated['status'] = $validated['status'] ?? 'active';
         $validated['type']   = $validated['type'] ?? Event::TYPE_FLIGHT;
         $validated['description'] = $this->purifyDescription($validated['description'] ?? null);
@@ -131,6 +133,7 @@ class EventController extends Controller
             'description'   => 'nullable|string',
             'category'      => 'nullable|string',
             'type'          => 'nullable|in:flight,non_flight',
+            'network'       => 'nullable|string|max:20',
             'status'        => 'nullable|in:active,cancelled',
             'banner'        => 'nullable|image|mimes:jpg,jpeg,png,gif,bmp,webp,avif|max:20480',
             'remove_banner' => 'nullable|boolean',
@@ -139,6 +142,14 @@ class EventController extends Controller
         // Pas de type envoyé : on ne touche pas à celui de l'évènement
         if (empty($validated['type'])) {
             unset($validated['type']);
+        }
+
+        // Réseau : mis à jour seulement s'il est envoyé par le formulaire
+        // (le glisser-déposer du calendrier ne l'envoie pas -> on n'y touche pas)
+        if ($request->has('network')) {
+            $validated['network'] = Event::cleanNetwork($request->input('network'));
+        } else {
+            unset($validated['network']);
         }
 
         $validated['description'] = $this->purifyDescription($validated['description'] ?? null);

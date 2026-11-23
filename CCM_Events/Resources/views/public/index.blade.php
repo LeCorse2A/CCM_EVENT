@@ -39,6 +39,18 @@ if (!function_exists('ccmCleanDescription')) {
 $goingCount   = $events->where('my_participation', 'participating')->count();
 $totalCount   = $events->count();
 $pendingCount = $events->whereNull('my_participation')->count();
+// Noms des aéroports (table phpVMS "airports", clé = ICAO)
+$ccmIcaos = collect([$events->all()])->flatten(1)
+    ->flatMap(function ($e) { return $e->legs->flatMap(function ($l) { return [$l->departure_icao, $l->arrival_icao]; }); })
+    ->unique()->values()->all();
+$ccmAirports = $ccmIcaos ? \App\Models\Airport::whereIn('id', $ccmIcaos)->pluck('name', 'id') : collect();
+
+// Logos des réseaux
+$ccmNetLogos = [
+    'ivao'   => ['src' => public_asset('/SPTheme/images/ivao-small.png'),   'name' => 'IVAO'],
+    'vatsim' => ['src' => public_asset('/SPTheme/images/vatsim-small.png'), 'name' => 'VATSIM'],
+];
+
 
 $stats = [
     ['value' => $totalCount,   'label' => 'Évènement(s)',          'icon' => 'ph-calendar-check'],
@@ -101,6 +113,16 @@ $stats = [
 .ccm-modal-box select.form-control { background-color: var(--bs-body-bg); color: var(--bs-body-color); border-color: var(--bs-border-color); }
 html[data-bs-theme="dark"] .ccm-modal-box select.form-control { color-scheme: dark; }
 html[data-bs-theme="light"] .ccm-modal-box select.form-control { color-scheme: light; }
+
+/* Trajets avec nom des aéroports */
+.ccm-legs2 { width:100%; margin-bottom:12px; }
+.ccm-leg2 { display:flex; align-items:center; justify-content:center; gap:10px; background: var(--bs-tertiary-bg); border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; }
+.ccm-leg2-apt { flex:1; min-width:0; line-height:1.25; text-align:center; }
+.ccm-leg2 .ccm-leg2-icao { display:block; font-family:monospace; font-weight:700 !important; font-size:17px !important; color: var(--bs-body-color) !important; }
+.ccm-leg2 .ccm-leg2-name { display:block; font-size:11px !important; opacity:.75; color: var(--bs-body-color) !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ccm-leg2 .ccm-leg2-arrow { font-size:20px !important; font-weight:700; color: var(--bs-primary) !important; flex:0 0 auto; }
+.ccm-net-row { display:inline-flex; align-items:center; gap:8px; background: var(--bs-tertiary-bg); border-radius: 20px; padding: 4px 12px; font-size:13px !important; font-weight:600; }
+.ccm-net-row img { height:22px; width:auto; }
 </style>
 
 <div class="row">
@@ -181,6 +203,17 @@ html[data-bs-theme="light"] .ccm-modal-box select.form-control { color-scheme: l
             </div>
           </div>
 
+          @if(count($event->networks()))
+            <div class="mb-3">
+              <span class="ccm-net-row">
+                Réseau :
+                @foreach($event->networks() as $net)
+                  @if(isset($ccmNetLogos[$net]))<img src="{{ $ccmNetLogos[$net]['src'] }}" alt="{{ $ccmNetLogos[$net]['name'] }}" title="{{ $ccmNetLogos[$net]['name'] }}">@endif
+                @endforeach
+              </span>
+            </div>
+          @endif
+
           {{-- Date + heure : Zulu en principal, heure française en petit --}}
           <div class="ccm-ev-date-pill align-self-center">
             <span class="ccm-ev-date-main">
@@ -192,9 +225,19 @@ html[data-bs-theme="light"] .ccm-modal-box select.form-control { color-scheme: l
 
           {{-- Trajets : juste sous la date --}}
           @if($isFlight)
-          <div class="ccm-ev-legs align-self-center">
+          <div class="ccm-legs2">
             @foreach($event->legs as $leg)
-              <div class="ccm-leg"><i class="ph-fill ph-airplane-in-flight"></i> <b>{{ $leg->departure_icao }}</b> <i class="ph-bold ph-arrow-right"></i> <b>{{ $leg->arrival_icao }}</b></div>
+              <div class="ccm-leg2">
+                <div class="ccm-leg2-apt">
+                  <span class="ccm-leg2-icao">{{ $leg->departure_icao }}</span>
+                  <span class="ccm-leg2-name" title="{{ $ccmAirports[$leg->departure_icao] ?? '' }}">{{ $ccmAirports[$leg->departure_icao] ?? '' }}</span>
+                </div>
+                <span class="ccm-leg2-arrow">&rarr;</span>
+                <div class="ccm-leg2-apt">
+                  <span class="ccm-leg2-icao">{{ $leg->arrival_icao }}</span>
+                  <span class="ccm-leg2-name" title="{{ $ccmAirports[$leg->arrival_icao] ?? '' }}">{{ $ccmAirports[$leg->arrival_icao] ?? '' }}</span>
+                </div>
+              </div>
             @endforeach
           </div>
           @endif

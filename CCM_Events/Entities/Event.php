@@ -20,6 +20,7 @@ class Event extends Model
         'description',
         'category',
         'type',
+        'network',
         'status',
         'created_by_user_id',
         'flights_enabled',
@@ -36,6 +37,27 @@ class Event extends Model
     public function isFlight(): bool
     {
         return ($this->type ?? self::TYPE_FLIGHT) === self::TYPE_FLIGHT;
+    }
+
+    /**
+     * Réseaux de l'évènement : ['ivao'], ['vatsim'], ['ivao','vatsim'] ou [].
+     * Stockés dans la colonne "network" sous la forme "ivao,vatsim".
+     */
+    public function networks(): array
+    {
+        return array_values(array_filter(explode(',', (string) $this->network)));
+    }
+
+    /**
+     * Nettoie une valeur reçue du formulaire ("ivao,vatsim") : ne garde que
+     * ivao / vatsim, dans cet ordre. Retourne null si rien n'est coché.
+     */
+    public static function cleanNetwork($value): ?string
+    {
+        $values = array_map('trim', explode(',', strtolower((string) $value)));
+        $kept   = array_values(array_intersect(['ivao', 'vatsim'], $values));
+
+        return $kept ? implode(',', $kept) : null;
     }
 
     public function legs()

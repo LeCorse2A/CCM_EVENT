@@ -163,6 +163,19 @@
           <select class="form-control" id="ccm-category"></select>
         </div>
         <div class="form-group">
+          <label>Réseau(x)</label>
+          <div class="d-flex gap-4">
+            <label class="d-flex align-items-center gap-2 mb-0" style="cursor:pointer;">
+              <input type="checkbox" id="ccm-net-ivao" value="ivao">
+              <img src="{{ public_asset('/SPTheme/images/ivao-small.png') }}" alt="IVAO" style="height:22px;"> IVAO
+            </label>
+            <label class="d-flex align-items-center gap-2 mb-0" style="cursor:pointer;">
+              <input type="checkbox" id="ccm-net-vatsim" value="vatsim">
+              <img src="{{ public_asset('/SPTheme/images/vatsim-small.png') }}" alt="VATSIM" style="height:22px;"> VATSIM
+            </label>
+          </div>
+        </div>
+        <div class="form-group">
           <label>Description</label>
           <div id="ccm-description-editor" style="background:#fff;"></div>
           <textarea id="ccm-description" style="display:none;"></textarea>
@@ -374,6 +387,9 @@ function ccmOpenEventModal(id = null, prefillDate = null) {
       document.getElementById('ccm-end').value = ev.end_time.substring(0,5);
       document.getElementById('ccm-category').value = ev.category;
       document.getElementById('ccm-type').value = ev.type || 'flight';
+      const nets = (ev.network || '').split(',');
+      document.getElementById('ccm-net-ivao').checked   = nets.includes('ivao');
+      document.getElementById('ccm-net-vatsim').checked = nets.includes('vatsim');
       ccmQuill.root.innerHTML = ev.description || '';
       document.getElementById('ccm-description').value = ev.description || '';
       document.getElementById('ccm-delete-btn').style.display = 'inline-block';
@@ -566,6 +582,7 @@ document.getElementById('ccm-event-form').addEventListener('submit', function(e)
   fd.append('end_time', document.getElementById('ccm-end').value);
   fd.append('category', document.getElementById('ccm-category').value);
   fd.append('type', document.getElementById('ccm-type').value);
+  fd.append('network', ['ivao', 'vatsim'].filter(n => document.getElementById('ccm-net-' + n).checked).join(','));
   fd.append('description', document.getElementById('ccm-description').value);
 
   const bannerInput = document.getElementById('ccm-banner-input');
