@@ -291,6 +291,16 @@ html[data-bs-theme="light"] .ccm-modal-box select.form-control { color-scheme: l
               @endif
             @elseif($event->my_reservation)
               <span class="badge bg-success"><i class="ph-fill ph-map-pin align-middle me-1"></i>Réservé : {{ $event->my_reservation->airport_icao }}@if($event->my_reservation->stand) · {{ $event->my_reservation->stand }} @endif</span>
+              {{-- Modifier : masqué si l'avion a déjà été positionné par le staff (vol activé) --}}
+              @if(!$event->my_reservation->original_airport_id)
+                <button class="btn btn-sm btn-outline-primary"
+                        data-icao="{{ $event->my_reservation->airport_icao }}"
+                        data-stand="{{ $event->my_reservation->stand }}"
+                        data-aircraft="{{ $event->my_reservation->aircraft_id }}"
+                        onclick="ccmEditReservation(this, {{ $event->id }})">
+                  <i class="ph-fill ph-pencil-simple align-middle me-1"></i> Modifier ma réservation
+                </button>
+              @endif
               <button class="btn btn-sm btn-outline-secondary" onclick="ccmCancelReservation({{ $event->my_reservation->id }})">Annuler ma réservation</button>
             @else
               <button class="btn btn-primary btn-sm w-100" onclick="ccmOpenReservationModal({{ $event->id }})">
@@ -342,7 +352,7 @@ html[data-bs-theme="light"] .ccm-modal-box select.form-control { color-scheme: l
   {{-- ── Modale Réservation ── --}}
   <div class="ccm-modal" id="ccm-resa-modal">
     <div class="ccm-modal-box">
-      <h4>Je participe — Réserver mon avion</h4>
+      <h4 id="ccm-resa-title">Je participe — Réserver mon avion</h4>
       <input type="hidden" id="ccm-resa-event-id" value="">
 
       <div class="form-group" id="ccm-resa-legs-group" style="display:none;">
@@ -504,15 +514,30 @@ function ccmShowParticipants(eventId) {
 }
 
 // ── Réservation ──
-function ccmOpenReservationModal(eventId) {
+// ccmEdit = null en création, ou { icao, stand, aircraft } en modification
+let ccmEdit = null;
+
+function ccmEditReservation(btn, eventId) {
+  ccmOpenReservationModal(eventId, {
+    icao: (btn.dataset.icao || '').toUpperCase(),
+    stand: btn.dataset.stand || '',
+    aircraft: btn.dataset.aircraft || '',
+  });
+}
+
+function ccmOpenReservationModal(eventId, edit = null) {
+  ccmEdit = edit;
+  document.getElementById('ccm-resa-title').textContent = edit ? 'Modifier ma réservation' : 'Je participe — Réserver mon avion';
+  document.getElementById('ccm-resa-submit').textContent = edit ? 'Enregistrer' : 'Réserver';
   document.getElementById('ccm-resa-event-id').value = eventId;
-  document.getElementById('ccm-resa-airport').value = '';
+  document.getElementById('ccm-resa-airport').value = edit ? edit.icao : '';
   document.getElementById('ccm-resa-stand').innerHTML = '<option value="">-- Choisir un aéroport d\'abord --</option>';
   document.getElementById('ccm-resa-stand-group').style.display = 'block';
   ccmStandsRequired = false;
   document.getElementById('ccm-resa-error').style.display = 'none';
   ccmLoadMyAircraft(eventId);
   ccmLoadLegsForReservation(eventId);
+  if (edit) ccmLoadStands(); // stands de l'aéroport déjà réservé, avec le sien présélectionné
   ccmOpenModal('ccm-resa-modal');
 }
 
@@ -538,8 +563,9 @@ function ccmLoadLegsForReservation(eventId) {
         `).join('');
 
         // Aéroport pré-rempli avec le départ du leg 1
+        // (en modification, on garde l'aéroport déjà réservé)
         ccmLegOneDep = data.legs[0].departure_icao || '';
-        ccmSyncAirportFromLegs();
+        if (!ccmEdit) ccmSyncAirportFromLegs();
       });
     })
     .catch(() => {});
@@ -589,13 +615,15 @@ function ccmLoadStands() {
         return;
       }
       ccmStandsRequired = true;
-      const reserved = (data.reserved || []).map(String);
+      // En modification, mon propre stand n'est pas "pris" : il reste sélectionnable
+      const isMine = s => ccmEdit && icao === ccmEdit.icao && String(s) === String(ccmEdit.stand);
+      const reserved = (data.reserved || []).map(String).filter(s => !isMine(s));
       const libres = stands.filter(s => !reserved.includes(String(s))).length;
       // Les stands déjà réservés par un autre pilote sont grisés et non sélectionnables
       standSel.innerHTML = `<option value="">${libres ? '-- Choisir un stand --' : '-- Tous les stands sont pris --'}</option>` +
         stands.map(s => {
           const pris = reserved.includes(String(s));
-          return `<option value="${esc(s)}" ${pris ? 'disabled' : ''}>${esc(s)}${pris ? ' (réservé)' : ''}</option>`;
+          return `<option value="${esc(s)}" ${pris ? 'disabled' : ''} ${isMine(s) ? 'selected' : ''}>${esc(s)}${pris ? ' (réservé)' : ''}</option>`;
         }).join('');
     })
     .catch(() => { if (myReq === ccmStandReq) standSel.innerHTML = '<option value="">Erreur de chargement</option>'; });
@@ -608,6 +636,8 @@ function ccmLoadMyAircraft(eventId) {
     .then(data => {
       aircraftSel.innerHTML = '<option value="">-- Choisir --</option>' +
         data.aircraft.map(a => `<option value="${esc(a.id)}">${esc(a.icao)} | ${esc(a.registration)}${a.name ? ' - ' + esc(a.name) : ''}</option>`).join('');
+      // En modification : avion déjà réservé présélectionné
+      if (ccmEdit && ccmEdit.aircraft) aircraftSel.value = String(ccmEdit.aircraft);
     })
     .catch(() => { aircraftSel.innerHTML = '<option value="">Erreur de chargement</option>'; });
 }
